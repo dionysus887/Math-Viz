@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MathViz — Function Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0A0A0F;
+    --panel: #111118;
+    --panel2: #181824;
+    --border: #1E1E2E;
+    --accent: #7C3AED;
+    --accent2: #22D3EE;
+    --accent3: #F59E0B;
+    --accent4: #10B981;
+    --text: #E2E8F0;
+    --text2: #94A3B8;
+    --text3: #475569;
+    --danger: #EF4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 2;
+  }
+  .logo span { color: var(--accent); }
+  #waveCanvas {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    height: 52px;
+    opacity: 0.18;
+    pointer-events: none;
+  }
+  .header-right {
+    display: flex;
+    gap: 8px;
+    z-index: 2;
+    align-items: center;
+  }
+  .badge {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--border);
+    color: var(--text2);
+    border: 1px solid var(--border);
+  }
+
+  /* LAYOUT */
+  .workspace {
+    display: grid;
+    grid-template-columns: 280px 1fr 260px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .section-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 16px 16px 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* EQUATION INPUTS */
+  .eq-list { padding: 0 12px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .eq-row {
+    display: grid;
+    grid-template-columns: 16px 1fr 28px;
+    gap: 6px;
+    align-items: center;
+  }
+  .eq-color {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: 3px;
+  }
+  .eq-input {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .eq-input:focus { border-color: var(--accent); }
+  .eq-input.error { border-color: var(--danger); }
+  .eq-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--text3); font-size: 14px;
+    transition: color 0.15s;
+    padding: 4px;
+    line-height: 1;
+  }
+  .eq-del:hover { color: var(--danger); }
+  .add-eq-btn {
+    margin: 0 12px 12px;
+    background: var(--panel2);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 12px;
+    padding: 7px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s;
+    width: calc(100% - 24px);
+  }
+  .add-eq-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* CONTROLS */
+  .ctrl-group { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ctrl-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ctrl-label { font-size: 11px; color: var(--text2); white-space: nowrap; flex-shrink: 0; min-width: 60px; }
+  .ctrl-val {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent2);
+    min-width: 36px;
+    text-align: right;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    flex: 1;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { background: var(--accent2); }
+
+  /* PRESETS */
+  .presets { padding: 0 12px 12px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .preset-btn {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text2);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* MORPH */
+  .morph-panel { padding: 0 12px 12px; }
+  .morph-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent), #4F46E5);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 9px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    margin-top: 6px;
+  }
+  .morph-btn:hover { opacity: 0.85; }
+  .morph-target {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    outline: none;
+    width: 100%;
+    margin-bottom: 6px;
+  }
+  .morph-target:focus { border-color: var(--accent3); }
+
+  /* SOUND */
+  .sound-panel { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .sound-btn {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 11px;
+    padding: 8px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .sound-btn.active { border-color: var(--accent4); color: var(--accent4); }
+  .sound-btn:hover { border-color: var(--text2); }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* MAIN CANVAS AREA */
+  .main-area {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* CANVAS CONTAINER */
+  .canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  canvas#graph2d, canvas#graph3d, canvas#soundViz {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: none;
+  }
+  canvas#graph2d.active, canvas#graph3d.active, canvas#soundViz.active { display: block; }
+
+  /* CROSSHAIR */
+  .crosshair-info {
+    position: absolute;
+    bottom: 12px; left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    background: rgba(10,10,15,0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    pointer-events: none;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .right-panel::-webkit-scrollbar { width: 4px; }
+  .right-panel::-webkit-scrollbar-track { background: transparent; }
+  .right-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ANALYSIS CARDS */
+  .analysis-card {
+    margin: 6px 10px;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .analysis-card h4 {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 8px;
+  }
+  .analysis-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .analysis-row:last-child { border-bottom: none; }
+  .analysis-key { font-size: 11px; color: var(--text2); }
+  .analysis-val {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent2);
+  }
+  .analysis-val.pos { color: var(--accent4); }
+  .analysis-val.neg { color: var(--danger); }
+
+  .zeros-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .zero-chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    padding: 2px 5px;
+  }
+
+  /* MINI SOUND VIZ */
+  #miniSoundBar {
+    width: calc(100% - 20px);
+    height: 40px;
+    margin: 0 10px 6px;
+    border-radius: 6px;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    display: none;
+  }
+  #miniSoundBar.visible { display: block; }
+
+  /* STATUS */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 10px;
+    font-size: 10px;
+    color: var(--text3);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent4);
+  }
+  .status-dot.error { background: var(--danger); }
+
+  /* MORPHING PROGRESS */
+  #morphBar {
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent3), var(--accent));
+    width: 0%;
+    transition: none;
+    flex-shrink: 0;
+  }
+
+  /* 3D CONTROLS HINT */
+  .hint {
+    position: absolute;
+    top: 10px; right: 10px;
+    font-size: 9px;
+    color: var(--text3);
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(10,10,15,0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    pointer-events: none;
+    display: none;
+  }
+  .hint.visible { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">∿ <span>Math</span>Viz</div>
+  <canvas id="waveCanvas"></canvas>
+  <div class="header-right">
+    <span class="badge">X=TIME · Y=PITCH</span>
+  </div>
+</header>
+
+<div id="morphBar"></div>
+
+<div class="workspace">
+  <div class="sidebar">
+    <div class="section-label">Functions</div>
+    <div class="eq-list" id="eqList"></div>
+    <button class="add-eq-btn" onclick="addEquation()">+ Add function</button>
+
+    <div class="divider"></div>
+    <div class="section-label">Presets</div>
+    <div class="presets">
+      <button class="preset-btn" onclick="loadPreset('sin(x)')">sin(x)</button>
+      <button class="preset-btn" onclick="loadPreset('cos(x)')">cos(x)</button>
+      <button class="preset-btn" onclick="loadPreset('tan(x)')">tan(x)</button>
+      <button class="preset-btn" onclick="loadPreset('x^2')">x²</button>
+      <button class="preset-btn" onclick="loadPreset('x^3-x')">x³−x</button>
+      <button class="preset-btn" onclick="loadPreset('1/x')">1/x</button>
+      <button class="preset-btn" onclick="loadPreset('sqrt(abs(x))')">√|x|</button>
+      <button class="preset-btn" onclick="loadPreset('sin(x)*cos(x)')">sincos</button>
+      <button class="preset-btn" onclick="loadPreset('e^(-x^2)')">Gauss</button>
+      <button class="preset-btn" onclick="loadPreset('sin(1/x)')">sin(1/x)</button>
+      <button class="preset-btn" onclick="loadPreset('floor(x)')">floor</button>
+      <button class="preset-btn" onclick="loadPreset('log(x)')">log</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">View Range</div>
+    <div class="ctrl-group">
+      <div class="ctrl-row">
+        <span class="ctrl-label">Time (X Range)</span>
+        <input type="range" id="xRange" min="2" max="50" value="10" oninput="updateRange()">
+        <span class="ctrl-val" id="xRangeVal">±10</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Pitch (Y Range)</span>
+        <input type="range" id="yRange" min="2" max="50" value="10" oninput="updateRange()">
+        <span class="ctrl-val" id="yRangeVal">±10</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Resolution</span>
+        <input type="range" id="resolution" min="100" max="2000" step="100" value="800" oninput="render2D()">
+        <span class="ctrl-val" id="resVal">800</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Grid</span>
+        <input type="range" id="gridSize" min="1" max="10" value="1" oninput="render2D()">
+        <span class="ctrl-val" id="gridVal">1</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Morph</div>
+    <div class="morph-panel">
+      <input class="morph-target" type="text" id="morphTarget" placeholder="target: e.g. x^3" value="x^3">
+      <div class="ctrl-row" style="margin-bottom:6px;">
+        <span class="ctrl-label">Duration</span>
+        <input type="range" id="morphDuration" min="500" max="5000" step="500" value="2000" oninput="document.getElementById('morphDurVal').textContent=this.value+'ms'">
+        <span class="ctrl-val" id="morphDurVal">2000ms</span>
+      </div>
+      <button class="morph-btn" onclick="startMorph()">▶ Morph to Target</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Sound Layout</div>
+    <div class="sound-panel">
+      <div class="ctrl-row">
+        <span class="ctrl-label">Base Pitch</span>
+        <input type="range" id="baseFreq" min="110" max="880" value="220" oninput="document.getElementById('freqVal').textContent=this.value+'Hz'">
+        <span class="ctrl-val" id="freqVal">220Hz</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Volume</span>
+        <input type="range" id="volume" min="0" max="100" value="40" oninput="updateVolume()">
+        <span class="ctrl-val" id="volVal">40%</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Playback Speed</span>
+        <input type="range" id="soundSpeed" min="1" max="10" value="3" oninput="document.getElementById('speedVal').textContent=this.value+'×'">
+        <span class="ctrl-val" id="speedVal">3×</span>
+      </div>
+      <button class="sound-btn" id="soundBtn" onclick="toggleSound()">▶ Play Timeline Sweep</button>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('2d',this)">2D Graph</button>
+      <button class="tab-btn" onclick="switchTab('3d',this)">3D Surface</button>
+      <button class="tab-btn" onclick="switchTab('sound',this)">Pitch Log (Spectrogram)</button>
+    </div>
+    <div class="canvas-container" id="canvasContainer">
+      <canvas id="graph2d" class="active"></canvas>
+      <canvas id="graph3d"></canvas>
+      <canvas id="soundViz"></canvas>
+      <div class="crosshair-info" id="cursorInfo">t: — &nbsp; pitch: —</div>
+      <div class="hint" id="hint3d">Drag to rotate · Scroll to zoom</div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="section-label">Analysis</div>
+
+    <canvas id="miniSoundBar"></canvas>
+
+    <div class="analysis-card" id="funcAnalysis">
+      <h4>Function Info</h4>
+      <div id="analysisContent">
+        <div class="analysis-row">
+          <span class="analysis-key">Expression</span>
+          <span class="analysis-val" id="aExpr">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">f(0)</span>
+          <span class="analysis-val" id="aAt0">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">f(1)</span>
+          <span class="analysis-val" id="aAt1">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">Max (view)</span>
+          <span class="analysis-val pos" id="aMax">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">Min (view)</span>
+          <span class="analysis-val neg" id="aMin">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">Avg (view)</span>
+          <span class="analysis-val" id="aAvg">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">∫ (area)</span>
+          <span class="analysis-val" id="aInteg">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="analysis-card">
+      <h4>Zero Crossings</h4>
+      <div class="zeros-list" id="zerosContainer">
+        <span style="font-size:10px;color:var(--text3);">—</span>
+      </div>
+    </div>
+
+    <div class="analysis-card">
+      <h4>Derivative</h4>
+      <div class="analysis-row">
+        <span class="analysis-key">f'(0)</span>
+        <span class="analysis-val" id="dAt0">—</span>
+      </div>
+      <div class="analysis-row">
+        <span class="analysis-key">f'(1)</span>
+        <span class="analysis-val" id="dAt1">—</span>
+      </div>
+      <div class="analysis-row">
+        <span class="analysis-key">Monotonic?</span>
+        <span class="analysis-val" id="dMono">—</span>
+      </div>
+    </div>
+
+    <div class="analysis-card">
+      <h4>Sound Harmonics</h4>
+      <div id="harmonicsContent">
+        <div class="analysis-row">
+          <span class="analysis-key">Current Pitch</span>
+          <span class="analysis-val" id="hFund">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">Shape Mode</span>
+          <span class="analysis-val" id="hShape">—</span>
+        </div>
+        <div class="analysis-row">
+          <span class="analysis-key">Translation</span>
+          <span class="analysis-val" id="hOver">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Ready</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== STATE =====================
+const COLORS = ['#7C3AED','#22D3EE','#F59E0B','#10B981','#EF4444','#EC4899'];
+let equations = [];
+let eqIdCounter = 0;
+let xRange = 10, yRange = 10;
+let currentTab = '2d';
+let morphAnim = null;
+let morphSrc = null, morphTgt = null;
+
+// Sound Engine Variables
+let audioCtx = null;
+let mainOscillator = null;
+let mainGainNode = null;
+let soundPlaying = false;
+let playheadX = 0; // Current running time coordinate position
+let pitchHistory = []; // Buffered list for the spectrogram rendering
+
+// ===================== EQUATIONS =====================
+function addEquation(expr = 'sin(x)') {
+  const id = eqIdCounter++;
+  const color = COLORS[equations.length % COLORS.length];
+  equations.push({ id, expr, color, compiled: null, error: false });
+  renderEqList();
+  compileAll();
+}
+
+function removeEquation(id) {
+  equations = equations.filter(e => e.id !== id);
+  renderEqList();
+  renderAll();
+  analyzeFirst();
+}
+
+function renderEqList() {
+  const list = document.getElementById('eqList');
+  list.innerHTML = '';
+  equations.forEach(eq => {
+    const row = document.createElement('div');
+    row.className = 'eq-row';
+    row.innerHTML = `
+      <div class="eq-color" style="background:${eq.color}"></div>
+      <input class="eq-input ${eq.error?'error':''}" type="text" value="${eq.expr}"
+        data-id="${eq.id}"
+        oninput="updateExpr(${eq.id}, this.value)"
+        placeholder="f(x) = ...">
+      <button class="eq-del" onclick="removeEquation(${eq.id})">×</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function updateExpr(id, val) {
+  const eq = equations.find(e => e.id === id);
+  if (eq) { eq.expr = val; compileAll(); renderAll(); analyzeFirst(); }
+}
+
+function compileAll() {
+  equations.forEach(eq => {
+    try {
+      eq.compiled = math.compile(eq.expr);
+      eq.error = false;
+    } catch { eq.compiled = null; eq.error = true; }
+  });
+  document.querySelectorAll('.eq-input').forEach(inp => {
+    const id = parseInt(inp.dataset.id);
+    const eq = equations.find(e => e.id === id);
+    if (eq) inp.classList.toggle('error', eq.error);
+  });
+}
+
+function loadPreset(expr) {
+  if (equations.length === 0) addEquation(expr);
+  else {
+    equations[0].expr = expr;
+    renderEqList();
+    compileAll();
+    renderAll();
+    analyzeFirst();
+  }
+}
+
+// ===================== 2D GRAPH =====================
+const c2d = document.getElementById('graph2d');
+const ctx2d = c2d.getContext('2d');
+let dragging2d = false, drag2dStart = null, offsetX = 0, offsetY = 0;
+let zoom2d = 1;
+
+function sizeCanvas2D() {
+  const container = document.getElementById('canvasContainer');
+  c2d.width = container.offsetWidth;
+  c2d.height = container.offsetHeight;
+}
+
+function render2D() {
+  sizeCanvas2D();
+  const W = c2d.width, H = c2d.height;
+  ctx2d.clearRect(0, 0, W, H);
+
+  const xR = xRange / zoom2d;
+  const yR = yRange / zoom2d;
+  const cx = W/2 + offsetX, cy = H/2 + offsetY;
+  const sx = W / (2 * xR);
+  const sy = H / (2 * yR);
+
+  // Grid
+  ctx2d.strokeStyle = '#1A1A28';
+  ctx2d.lineWidth = 1;
+  const gridStep = parseFloat(document.getElementById('gridSize').value);
+  const xStart = Math.floor((-W/2 - offsetX) / sx / gridStep) * gridStep;
+  const xEnd = Math.ceil((W/2 - offsetX) / sx / gridStep) * gridStep;
+  for (let gx = xStart; gx <= xEnd; gx += gridStep) {
+    const px = cx + gx * sx;
+    ctx2d.beginPath();
+    ctx2d.moveTo(px, 0); ctx2d.lineTo(px, H);
+    ctx2d.stroke();
+  }
+  const yStart = Math.floor((-H/2 - offsetY) / sy / gridStep) * gridStep;
+  const yEnd = Math.ceil((H/2 - offsetY) / sy / gridStep) * gridStep;
+  for (let gy = yStart; gy <= yEnd; gy += gridStep) {
+    const py = cy - gy * sy;
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, py); ctx2d.lineTo(W, py);
+    ctx2d.stroke();
+  }
+
+  // Axes
+  ctx2d.strokeStyle = '#2D2D44';
+  ctx2d.lineWidth = 1.5;
+  ctx2d.beginPath(); ctx2d.moveTo(0, cy); ctx2d.lineTo(W, cy); ctx2d.stroke();
+  ctx2d.beginPath(); ctx2d.moveTo(cx, 0); ctx2d.lineTo(cx, H); ctx2d.stroke();
+
+  // Axis labels
+  ctx2d.fillStyle = '#475569';
+  ctx2d.font = '9px JetBrains Mono, monospace';
+  ctx2d.textAlign = 'center';
+  for (let gx = Math.ceil(xStart); gx <= xEnd; gx++) {
+    if (gx === 0) continue;
+    const px = cx + gx * sx;
+    if (px < 10 || px > W - 10) continue;
+    ctx2d.fillText(gx, px, cy + 12);
+  }
+  ctx2d.textAlign = 'right';
+  for (let gy = Math.ceil(yStart); gy <= yEnd; gy++) {
+    if (gy === 0) continue;
+    const py = cy - gy * sy;
+    if (py < 10 || py > H - 10) continue;
+    ctx2d.fillText(gy, cx - 4, py + 3);
+  }
+
+  // Plot each equation
+  const res = parseInt(document.getElementById('resolution').value);
+  document.getElementById('resVal').textContent = res;
+  document.getElementById('gridVal').textContent = gridStep;
+
+  equations.forEach(eq => {
+    if (!eq.compiled) return;
+    ctx2d.beginPath();
+    ctx2d.strokeStyle = eq.color;
+    ctx2d.lineWidth = 2;
+    ctx2d.lineJoin = 'round';
+    let started = false;
+    for (let i = 0; i <= res; i++) {
+      const x = (-W/2 - offsetX) / sx + (i / res) * (W / sx);
+      let y;
+      try { y = eq.compiled.evaluate({ x }); } catch { y = NaN; }
+      if (isNaN(y) || !isFinite(y)) { started = false; continue; }
+      const px = cx + x * sx;
+      const py = cy - y * sy;
+      if (py < -H || py > H * 2) { started = false; continue; }
+      if (!started) { ctx2d.moveTo(px, py); started = true; }
+      else ctx2d.lineTo(px, py);
+    }
+    ctx2d.stroke();
+  });
+
+  // DRAW TIME SWEEP PLAYHEAD (If Playing Sound)
+  if (soundPlaying) {
+    const playheadPx = cx + playheadX * sx;
+    if (playheadPx >= 0 && playheadPx <= W) {
+      ctx2d.strokeStyle = 'rgba(34, 211, 238, 0.8)';
+      ctx2d.lineWidth = 2;
+      ctx2d.shadowColor = '#22D3EE';
+      ctx2d.shadowBlur = 8;
+      ctx2d.beginPath();
+      ctx2d.moveTo(playheadPx, 0);
+      ctx2d.lineTo(playheadPx, H);
+      ctx2d.stroke();
+      ctx2d.shadowBlur = 0;
+    }
+  }
+}
+
+// Pan & zoom 2D
+c2d.addEventListener('mousedown', e => {
+  dragging2d = true;
+  drag2dStart = { x: e.clientX - offsetX, y: e.clientY - offsetY };
+});
+c2d.addEventListener('mousemove', e => {
+  if (dragging2d) {
+    offsetX = e.clientX - drag2dStart.x;
+    offsetY = e.clientY - drag2dStart.y;
+    render2D();
+  }
+  const rect = c2d.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const xR = xRange / zoom2d;
+  const yR = yRange / zoom2d;
+  const cx = c2d.width/2 + offsetX, cy = c2d.height/2 + offsetY;
+  const sx = c2d.width / (2 * xR);
+  const sy = c2d.height / (2 * yR);
+  const wx = (mx - cx) / sx;
+  const wy = (cy - my) / sy;
+  document.getElementById('cursorInfo').textContent = `t: ${wx.toFixed(2)}s  pitch: ${wy.toFixed(2)} units`;
+});
+c2d.addEventListener('mouseup', () => dragging2d = false);
+c2d.addEventListener('mouseleave', () => dragging2d = false);
+c2d.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom2d *= e.deltaY > 0 ? 0.9 : 1.1;
+  zoom2d = Math.max(0.05, Math.min(20, zoom2d));
+  render2D();
+}, { passive: false });
+
+// ===================== 3D GRAPH =====================
+const c3d = document.getElementById('graph3d');
+let renderer, scene, camera, mesh3d, animId3d;
+let mouse3d = { down: false, last: null };
+
+function init3D() {
+  if (renderer) { renderer.dispose(); }
+  renderer = new THREE.WebGLRenderer({ canvas: c3d, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setClearColor(0x0A0A0F);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+  camera.position.set(20, 15, 20);
+  camera.lookAt(0, 0, 0);
+
+  const amb = new THREE.AmbientLight(0x334155, 1.5);
+  scene.add(amb);
+  const dir = new THREE.DirectionalLight(0x7C3AED, 2);
+  dir.position.set(10, 20, 10);
+  scene.add(dir);
+  const dir2 = new THREE.DirectionalLight(0x22D3EE, 1);
+  dir2.position.set(-10, -5, -10);
+  scene.add(dir2);
+
+  const gridH = new THREE.GridHelper(20, 20, 0x1E1E2E, 0x1A1A28);
+  scene.add(gridH);
+
+  resize3D();
+  render3D();
+}
+
+function resize3D() {
+  const container = document.getElementById('canvasContainer');
+  const W = container.offsetWidth, H = container.offsetHeight;
+  if (renderer) { renderer.setSize(W, H); camera.aspect = W/H; camera.updateProjectionMatrix(); }
+}
+
+function buildSurface3D() {
+  if (!scene) return;
+  if (mesh3d) scene.remove(mesh3d);
+
+  const eq = equations[0];
+  if (!eq || !eq.compiled) return;
+
+  const N = 60;
+  const geo = new THREE.BufferGeometry();
+  const verts = [], colors = [], indices = [];
+
+  for (let i = 0; i <= N; i++) {
+    for (let j = 0; j <= N; j++) {
+      const x = (i/N) * 20 - 10;
+      const z = (j/N) * 20 - 10;
+      let y = 0;
+      try { y = eq.compiled.evaluate({ x, y: z }); } catch {}
+      if (!isFinite(y)) y = 0;
+      y = Math.max(-8, Math.min(8, y));
+      verts.push(x, y, z);
+      const t = (y + 8) / 16;
+      const r = Math.min(1, t * 2);
+      const g = Math.min(1, t * 1.5 - 0.2);
+      const b = Math.max(0, 1 - t * 2);
+      colors.push(r, g, b);
+    }
+  }
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const a = i * (N+1) + j;
+      indices.push(a, a+1, a+N+1, a+1, a+N+2, a+N+1);
+    }
+  }
+
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshPhongMaterial({
+    vertexColors: true, side: THREE.DoubleSide,
+    shininess: 80, specular: new THREE.Color(0x22D3EE)
+  });
+  mesh3d = new THREE.Mesh(geo, mat);
+  scene.add(mesh3d);
+
+  const wf = new THREE.WireframeGeometry(geo);
+  const wfMat = new THREE.LineBasicMaterial({ color: 0x1E1E2E, opacity: 0.3, transparent: true });
+  scene.add(new THREE.LineSegments(wf, wfMat));
+}
+
+function render3D() {
+  if (animId3d) cancelAnimationFrame(animId3d);
+  animId3d = requestAnimationFrame(() => {
+    if (renderer && currentTab === '3d') {
+      renderer.render(scene, camera);
+      animId3d = requestAnimationFrame(function loop() {
+        if (currentTab !== '3d') return;
+        renderer.render(scene, camera);
+        animId3d = requestAnimationFrame(loop);
+      });
+    }
+  });
+}
+
+c3d.addEventListener('mousedown', e => { mouse3d.down = true; mouse3d.last = { x: e.clientX, y: e.clientY }; });
+c3d.addEventListener('mousemove', e => {
+  if (!mouse3d.down || !camera) return;
+  const dx = e.clientX - mouse3d.last.x;
+  const dy = e.clientY - mouse3d.last.y;
+  mouse3d.last = { x: e.clientX, y: e.clientY };
+  const theta = dx * 0.5 * Math.PI / 180;
+  const phi = dy * 0.5 * Math.PI / 180;
+  const pos = camera.position.clone();
+  const r = pos.length();
+  let t = Math.atan2(pos.x, pos.z) - theta;
+  let p = Math.acos(pos.y / r) + phi;
+  p = Math.max(0.1, Math.min(Math.PI - 0.1, p));
+  camera.position.set(r * Math.sin(p) * Math.sin(t), r * Math.cos(p), r * Math.sin(p) * Math.cos(t));
+  camera.lookAt(0, 0, 0);
+});
+c3d.addEventListener('mouseup', () => mouse3d.down = false);
+c3d.addEventListener('wheel', e => {
+  if (!camera) return;
+  e.preventDefault();
+  const r = camera.position.length() * (e.deltaY > 0 ? 1.1 : 0.9);
+  camera.position.setLength(Math.max(5, Math.min(60, r)));
+}, { passive: false });
+
+// ===================== SOUND/SPECTROGRAM VIZ =====================
+const soundCanvas = document.getElementById('soundViz');
+const soundCtx = soundCanvas.getContext('2d');
+let soundAnimId = null;
+
+function renderSoundViz() {
+  const W = soundCanvas.width, H = soundCanvas.height;
+  soundCtx.clearRect(0, 0, W, H);
+
+  // Background Grid Matrix
+  soundCtx.fillStyle = '#0A0A0F';
+  soundCtx.fillRect(0, 0, W, H);
+  
+  soundCtx.strokeStyle = '#1E1E2E';
+  soundCtx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) {
+    let yPos = (H / 5) * i;
+    soundCtx.beginPath();
+    soundCtx.moveTo(0, yPos); soundCtx.lineTo(W, yPos);
+    soundCtx.stroke();
+  }
+
+  const baseFreq = parseInt(document.getElementById('baseFreq').value || 220);
+  const maxFreq = baseFreq * 8;
+
+  // Render Pitch Automation Path History
+  if (pitchHistory.length > 1) {
+    soundCtx.beginPath();
+    soundCtx.strokeStyle = '#22D3EE';
+    soundCtx.lineWidth = 3;
+    soundCtx.shadowColor = '#22D3EE';
+    soundCtx.shadowBlur = 12;
+
+    for (let i = 0; i < pitchHistory.length; i++) {
+      let pt = pitchHistory[i];
+      // Distribute array objects evenly horizontally across the view window
+      let drawX = (i / pitchHistory.length) * W;
+      // Invert Y coordinate space so high pitch registers at top
+      let drawY = H - ((pt.freq - baseFreq) / (maxFreq - baseFreq)) * H; 
+
+      if (i === 0) soundCtx.moveTo(drawX, drawY);
+      else soundCtx.lineTo(drawX, drawY);
+    }
+    soundCtx.stroke();
+    soundCtx.shadowBlur = 0;
+  }
+
+  // Label designations
+  soundCtx.fillStyle = '#475569';
+  soundCtx.font = '10px JetBrains Mono, monospace';
+  soundCtx.fillText(`High Pitch (${Math.round(maxFreq)}Hz)`, 15, 20);
+  soundCtx.fillText(`Low Pitch (${baseFreq}Hz)`, 15, H - 15);
+
+  soundAnimId = requestAnimationFrame(renderSoundViz);
+}
+
+// ===================== UPGRADED SOUND TIMELINE ENGINE =====================
+function toggleSound() {
+  if (soundPlaying) stopSound();
+  else playSound();
+}
+
+function playSound() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  stopSound();
+
+  const eq = equations[0];
+  if (!eq || !eq.compiled) return;
+
+  const vol = parseInt(document.getElementById('volume').value) / 100;
+
+  // Initialize Native Oscillator Core Nodes instead of raw bitwise processor
+  mainOscillator = audioCtx.createOscillator();
+  mainGainNode = audioCtx.createGain();
+  
+  mainOscillator.type = 'sine'; 
+  mainGainNode.gain.setValueAtTime(vol * 0.4, audioCtx.currentTime);
+
+  mainOscillator.connect(mainGainNode);
+  mainGainNode.connect(audioCtx.destination);
+  
+  mainOscillator.start();
+  soundPlaying = true;
+
+  const btn = document.getElementById('soundBtn');
+  btn.textContent = '■ Stop Timeline Sweep';
+  btn.classList.add('active');
+
+  document.getElementById('miniSoundBar').classList.add('visible');
+  
+  // Set playhead directly at the left-most visible boundary
+  playheadX = -xRange;
+  pitchHistory = [];
+
+  // Spin real-time mathematical loop computation task runner
+  runTimelineLoop();
+}
+
+function stopSound() {
+  soundPlaying = false;
+  if (mainOscillator) {
+    try { mainOscillator.stop(); mainOscillator.disconnect(); } catch {}
+    mainOscillator = null;
+  }
+  if (mainGainNode) {
+    try { mainGainNode.disconnect(); } catch {}
+    mainGainNode = null;
+  }
+  const btn = document.getElementById('soundBtn');
+  btn.textContent = '▶ Play Timeline Sweep';
+  btn.classList.remove('active');
+  document.getElementById('miniSoundBar').classList.remove('visible');
+  
+  if (currentTab === '2d') render2D();
+}
+
+function updateVolume() {
+  const vol = parseInt(document.getElementById('volume').value) / 100;
+  document.getElementById('volVal').textContent = document.getElementById('volume').value + '%';
+  if (mainGainNode && soundPlaying) {
+    mainGainNode.gain.setTargetAtTime(vol * 0.4, audioCtx.currentTime, 0.05);
+  }
+}
+
+function runTimelineLoop() {
+  if (!soundPlaying) return;
+
+  const eq = equations[0];
+  if (!eq || !eq.compiled) { stopSound(); return; }
+
+  const baseFreq = parseInt(document.getElementById('baseFreq').value);
+  const speed = parseInt(document.getElementById('soundSpeed').value);
+
+  // Time advancement calculation step based on frame refresh rates (~60 FPS)
+  const dt = (1 / 60) * speed;
+  playheadX += dt;
+
+  // Wrap around loop timeline constraints if it crosses the right-side boundary
+  if (playheadX > xRange) {
+    playheadX = -xRange;
+    pitchHistory = []; // Wipe scrolling visualization canvas track logs
+  }
+
+  let yVal = 0;
+  try {
+    yVal = eq.compiled.evaluate({ x: playheadX });
+    if (!isFinite(yVal) || isNaN(yVal)) yVal = 0;
+  } catch { yVal = 0; }
+
+  // Map the Y coordinate boundary cleanly inside the viewport bounds onto an exponential target frequency scale
+  // Using exponential curves yields natural musical scaling perceptions to our ears
+  const normalizedY = Math.max(-yRange, Math.min(yRange, yVal)); 
+  const interpolationFactor = (normalizedY + yRange) / (2 * yRange); // Scale linearly to 0.0 - 1.0 range
+  
+  // Exponential dynamic base floor shift mapping calculation using selected baseFreq value
+  const targetFrequency = baseFreq * Math.pow(8, interpolationFactor);
+
+  // Smooth out atomic pop artifacts by gliding audio values evenly
+  if (mainOscillator) {
+    mainOscillator.frequency.setTargetAtTime(targetFrequency, audioCtx.currentTime, 0.03);
+  }
+
+  // Capture logging points for user interfaces
+  document.getElementById('hFund').textContent = Math.round(targetFrequency) + ' Hz';
+  document.getElementById('hShape').textContent = `t = ${playheadX.toFixed(2)}s`;
+  document.getElementById('hOver').textContent = `y = ${yVal.toFixed(2)}`;
+
+  pitchHistory.push({ time: playheadX, freq: targetFrequency });
+  if (pitchHistory.length > 200) pitchHistory.shift();
+
+  // Render updates to 2D playhead bar canvas elements
+  if (currentTab === '2d') render2D();
+  
+  drawMiniBar(interpolationFactor);
+
+  requestAnimationFrame(runTimelineLoop);
+}
+
+function drawMiniBar(intensity) {
+  const c = document.getElementById('miniSoundBar');
+  const ctx = c.getContext('2d');
+  c.width = c.offsetWidth; c.height = c.offsetHeight;
+  const W = c.width, H = c.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Render responsive real-time jumping visualizer node
+  const barHeight = Math.max(4, intensity * H);
+  const hue = 180 + (intensity * 120);
+  ctx.fillStyle = `hsl(${hue}, 90%, 60%)`;
+  ctx.fillRect(0, H - barHeight, W, barHeight);
+}
+
+// ===================== HEADER WAVE =====================
+const waveC = document.getElementById('waveCanvas');
+const waveCtx = waveC.getContext('2d');
+let wavePhase = 0;
+
+function drawHeaderWave() {
+  const W = waveC.width, H = waveC.height;
+  waveCtx.clearRect(0, 0, W, H);
+  wavePhase += 0.02;
+
+  const eq = equations[0];
+  waveCtx.beginPath();
+  waveCtx.strokeStyle = '#7C3AED';
+  waveCtx.lineWidth = 1.5;
+  for (let px = 0; px < W; px++) {
+    const t = (px / W) * 6 * Math.PI + wavePhase;
+    let y = Math.sin(t);
+    if (eq && eq.compiled) {
+      try { const v = eq.compiled.evaluate({ x: t }); if (isFinite(v)) y = Math.tanh(v) * 0.7 + y * 0.3; } catch {}
+    }
+    const py = H/2 - y * H * 0.35;
+    if (px === 0) waveCtx.moveTo(px, py); else waveCtx.lineTo(px, py);
+  }
+  waveCtx.stroke();
+  requestAnimationFrame(drawHeaderWave);
+}
+
+function sizeHeaderWave() {
+  const header = document.querySelector('header');
+  waveC.width = header.offsetWidth * 0.5;
+  waveC.height = 52;
+}
+
+// ===================== MORPH =====================
+function startMorph() {
+  const tgtExpr = document.getElementById('morphTarget').value.trim();
+  if (!tgtExpr) return;
+
+  let tgtCompiled;
+  try { tgtCompiled = math.compile(tgtExpr); } catch { setStatus('Invalid target expression', true); return; }
+
+  const eq = equations[0];
+  if (!eq || !eq.compiled) { setStatus('No source equation', true); return; }
+
+  const srcExpr = eq.expr;
+  const duration = parseInt(document.getElementById('morphDuration').value);
+  const startTime = performance.now();
+  const bar = document.getElementById('morphBar');
+
+  if (morphAnim) cancelAnimationFrame(morphAnim);
+
+  function frame(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+
+    const N = 200;
+    const xR = xRange / zoom2d;
+    const W = c2d.width, H = c2d.height;
+    const sx = W / (2 * xR);
+    const sy = H / (2 * (yRange / zoom2d));
+    const cx = W/2 + offsetX, cy = H/2 + offsetY;
+
+    sizeCanvas2D();
+    ctx2d.clearRect(0, 0, W, H);
+
+    render2D();
+
+    ctx2d.beginPath();
+    ctx2d.strokeStyle = eq.color;
+    ctx2d.lineWidth = 2.5;
+    let started = false;
+    for (let i = 0; i <= N; i++) {
+      const x = (-W/2 - offsetX) / sx + (i / N) * (W / sx);
+      let y1 = 0, y2 = 0;
+      try { y1 = eq.compiled.evaluate({ x }); } catch {}
+      try { y2 = tgtCompiled.evaluate({ x }); } catch {}
+      if (!isFinite(y1)) y1 = 0;
+      if (!isFinite(y2)) y2 = 0;
+      const y = y1 + (y2 - y1) * ease;
+      const px = cx + x * sx;
+      const py = cy - y * sy;
+      if (!started) { ctx2d.moveTo(px, py); started = true; }
+      else ctx2d.lineTo(px, py);
+    }
+    ctx2d.stroke();
+
+    bar.style.width = (t * 100) + '%';
+
+    if (t < 1) morphAnim = requestAnimationFrame(frame);
+    else {
+      bar.style.width = '0%';
+      equations[0].expr = tgtExpr;
+      equations[0].compiled = tgtCompiled;
+      renderEqList();
+      render2D();
+      analyzeFirst();
+      setStatus('Morphed to ' + tgtExpr);
+    }
+  }
+
+  morphAnim = requestAnimationFrame(frame);
+  setStatus('Morphing...');
+}
+
+// ===================== ANALYSIS =====================
+function analyzeFirst() {
+  const eq = equations[0];
+  if (!eq || !eq.compiled) {
+    ['aExpr','aAt0','aAt1','aMax','aMin','aAvg','aInteg','dAt0','dAt1','dMono'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('zerosContainer').innerHTML = '<span style="font-size:10px;color:var(--text3);">—</span>';
+    return;
+  }
+
+  const f = (x) => { try { const v = eq.compiled.evaluate({ x }); return isFinite(v) ? v : null; } catch { return null; } };
+
+  document.getElementById('aExpr').textContent = eq.expr.slice(0, 14);
+
+  const v0 = f(0), v1 = f(1);
+  document.getElementById('aAt0').textContent = v0 !== null ? v0.toFixed(4) : '—';
+  document.getElementById('aAt1').textContent = v1 !== null ? v1.toFixed(4) : '—';
+
+  const samples = [];
+  for (let i = 0; i <= 400; i++) {
+    const x = -xRange + (i / 400) * 2 * xRange;
+    const y = f(x);
+    if (y !== null) samples.push({ x, y });
+  }
+
+  if (samples.length) {
+    const ys = samples.map(s => s.y);
+    const max = Math.max(...ys), min = Math.min(...ys);
+    const avg = ys.reduce((a,b) => a+b, 0) / ys.length;
+    document.getElementById('aMax').textContent = max.toFixed(4);
+    document.getElementById('aMin').textContent = min.toFixed(4);
+    document.getElementById('aAvg').textContent = avg.toFixed(4);
+
+    let integ = 0;
+    for (let i = 1; i < samples.length; i++) {
+      const dx = samples[i].x - samples[i-1].x;
+      integ += (samples[i].y + samples[i-1].y) / 2 * dx;
+    }
+    document.getElementById('aInteg').textContent = integ.toFixed(4);
+
+    const zeros = [];
+    for (let i = 1; i < samples.length; i++) {
+      if (samples[i-1].y * samples[i].y <= 0 && Math.abs(samples[i].x - samples[i-1].x) < 1) {
+        const zx = samples[i-1].x - samples[i-1].y * (samples[i].x - samples[i-1].x) / (samples[i].y - samples[i-1].y);
+        zeros.push(zx.toFixed(2));
+      }
+    }
+    const zc = document.getElementById('zerosContainer');
+    if (zeros.length) {
+      zc.innerHTML = zeros.slice(0, 8).map(z => `<div class="zero-chip">${z}</div>`).join('');
+    } else {
+      zc.innerHTML = '<span style="font-size:10px;color:var(--text3);">None found</span>';
+    }
+
+    const h = 0.0001;
+    const d = (x) => { const a = f(x+h), b = f(x-h); return (a !== null && b !== null) ? (a-b)/(2*h) : null; };
+    const d0 = d(0), d1 = d(1);
+    document.getElementById('dAt0').textContent = d0 !== null ? d0.toFixed(4) : '—';
+    document.getElementById('dAt1').textContent = d1 !== null ? d1.toFixed(4) : '—';
+
+    const dVals = samples.map(s => d(s.x)).filter(v => v !== null);
+    const allPos = dVals.every(v => v >= 0);
+    const allNeg = dVals.every(v => v <= 0);
+    document.getElementById('dMono').textContent = allPos ? '↑ Increasing' : allNeg ? '↓ Decreasing' : 'Mixed';
+  }
+
+  setStatus('Analyzed: ' + eq.expr);
+}
+
+// ===================== RANGE =====================
+function updateRange() {
+  xRange = parseInt(document.getElementById('xRange').value);
+  yRange = parseInt(document.getElementById('yRange').value);
+  document.getElementById('xRangeVal').textContent = '±' + xRange;
+  document.getElementById('yRangeVal').textContent = '±' + yRange;
+  renderAll();
+  analyzeFirst();
+}
+
+// ===================== TABS =====================
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  document.getElementById('graph2d').classList.toggle('active', tab === '2d');
+  document.getElementById('graph3d').classList.toggle('active', tab === '3d');
+  document.getElementById('soundViz').classList.toggle('active', tab === 'sound');
+  document.getElementById('hint3d').classList.toggle('visible', tab === '3d');
+  document.getElementById('cursorInfo').style.display = tab === '2d' ? '' : 'none';
+
+  if (tab === '3d') {
+    if (!renderer) init3D();
+    buildSurface3D();
+    resize3D();
+    render3D(); // Kicks the threeJS loop back up cleanly on return
+  }
+  if (tab === 'sound') {
+    sizeSoundCanvas();
+    if (soundAnimId) cancelAnimationFrame(soundAnimId);
+    renderSoundViz();
+  } else {
+    if (soundAnimId) { cancelAnimationFrame(soundAnimId); soundAnimId = null; }
+  }
+  if (tab === '2d') render2D();
+}
+
+function sizeSoundCanvas() {
+  const container = document.getElementById('canvasContainer');
+  soundCanvas.width = container.offsetWidth;
+  soundCanvas.height = container.offsetHeight;
+}
+
+// ===================== HELPERS =====================
+function setStatus(msg, isError = false) {
+  document.getElementById('statusText').textContent = msg;
+  document.getElementById('statusDot').className = 'status-dot' + (isError ? ' error' : '');
+}
+
+function renderAll() {
+  if (currentTab === '2d') render2D();
+  if (currentTab === '3d') buildSurface3D();
+}
+
+// ===================== RESIZE =====================
+window.addEventListener('resize', () => {
+  sizeHeaderWave();
+  if (currentTab === '2d') render2D();
+  if (currentTab === '3d') resize3D();
+  if (currentTab === 'sound') sizeSoundCanvas();
+});
+
+// ===================== INIT =====================
+sizeHeaderWave();
+drawHeaderWave();
+addEquation('sin(x)');
+addEquation('cos(x)');
+render2D();
+analyzeFirst();
+setStatus('Ready');
+
+setTimeout(() => {
+  document.addEventListener('click', () => {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }, { once: true });
+}, 100);
+</script>
+</body>
+</html>
+
