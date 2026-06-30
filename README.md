@@ -1,8 +1,8 @@
-MATH-WIZ: FUNCTION EXPLORER
+MATH-VIZ: FUNCTION EXPLORER
 
 Introduction:
 
-Math-Wiz is a web-based application that illustrates math concepts using interactive graphics; an interactive dashboard and multi-dimensional function analyser.
+Math-Viz is a web-based application that illustrates math concepts using interactive graphics; an interactive dashboard and multi-dimensional function analyser.
 It is implemented completely in an HTML page (highly efficient) to convert complex algebraic expressions into 2D interactive graphical plots; 3D animated surface plots; and audible sounds produced by sweeping frequency (time-varying frequency).
 
 Core Features:
